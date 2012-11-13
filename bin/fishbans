@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+import sys
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from fishbans.exception import FishbansException
+from fishbans.bans import Player as BansPlayer, Service as BansService
+from fishbans.stats import Player as StatsPlayer, Service as StatsService
+
+options = []
+commands = []
+
+for arg in sys.argv[1:]:
+    if arg[0] == '-':
+        options.append(arg)
+    else:
+        commands.append(arg)
+
+def print_help():
+    lines = ['Usage: fishbans <operation>',
+    '',
+    'List of operations:',
+    '',
+    '  stats <player>           # get total player bans from each service',
+    '  stats <player> <service> # get total player bans from specific service',
+    '  stats <player> queue     # queue lookup',
+    '  bans <player>            # get ban information from each service',
+    '  bans <player> <service>  # get ban information from specific service',
+    '  bans <player> queue      # queue lookup']
+
+    for line in lines:
+        print(line)
+
+def bad_operation():
+    print('fishbans: invalid operation')
+    exit(1)
+
+def handle_exception(ex):
+    print('fishbans: {0}'.format(str(ex)))
+    exit(1)
+
+if len(commands) == 0 or 'help' in commands or '-h' in options or '--help' in options:
+    print_help()
+    sys.exit(0)
+
+if len(commands) == 2:
+    if commands[0] == 'stats':
+        player = StatsPlayer(commands[1])
+        
+        try:
+            stats = player.get_stats()
+
+            print('==========[ {0} ]=========='.format(stats['username']))
+            print('Total bans: {0}'.format(stats['totalbans']))
+
+            for key, value in stats['service'].iteritems():
+                print('  {0}: {1}'.format(key, value))
+        except FishbansException, ex:
+            handle_exception(ex)
+    elif commands[0] == 'bans':
+        player = BansPlayer(commands[1])
+        
+        try:
+            bans = player.get_bans()
+
+            print('==========[ {0} ]=========='.format(bans['username']))
+
+            for key, value in bans['service'].iteritems():
+                print('  {0}:'.format(key))
+                print '    bans: {0}'.format(value['bans'])
+
+                if isinstance(value['ban_info'], dict):
+                    for key, value in value['ban_info'].iteritems():
+                        print '      {0}: {1}'.format(key, value)
+        except FishbansException, ex:
+            handle_exception(ex)
+    else:
+        bad_operation()
+    pass
+
+if len(commands) == 3:
+    if commands[2] == 'queue':
+        if commands[0] == 'stats':
+            player = StatsPlayer(commands[1])
+
+            try:
+                if player.queue():
+                    print('{0} was successfully queued.'.format(player.player_name))
+                else:
+                    print('fishbans: queuing {0} failed.'.format(player.player_name))
+
+            except FishbansException, ex:
+                handle_exception(ex)
+
+        elif commands[0] == 'bans':
+            player = BansPlayer(commands[1])
+
+            try:
+                if player.queue():
+                    print('{0} was successfully queued.'.format(player.player_name))
+                else:
+                    print('fishbans: queuing {0} failed.'.format(player.player_name))
+                    
+            except FishbansException, ex:
+                handle_exception(ex)
+
+        else:
+            bad_operation()
+    else:
+        if commands[0] == 'stats':
+            service = StatsService(commands[2])
+            player = service.get_player(commands[1])
+            stats = player.get_stats()
+
+            print('==========[ {0} ]=========='.format(stats['username']))
+            for key, value in stats['service'].iteritems():
+                print('{0}: {1}'.format(key, value))
+
+        elif commands[0] == 'bans':
+            service = BansService(commands[2])
+            player = service.get_player(commands[1])
+            bans = player.get_bans()
+
+            print('==========[ {0} ]=========='.format(bans['username']))
+            for key, value in bans['service'].iteritems():
+                print('{0}:'.format(key))
+            print '    bans: {0}'.format(value['bans'])
+
+            if isinstance(value['ban_info'], dict):
+                for key, value in value['ban_info'].iteritems():
+                    print '      {0}: {1}'.format(key, value)
+        else:
+            bad_operation()
+    pass
